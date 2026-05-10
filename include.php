@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Точка подключения модуля `smstraffic`: регистрация автозагрузки классов в пространстве имён `Smstraffic`.
+ *
+ * Подключается ядром при `Loader::includeModule('smstraffic')`. Карта соответствует физическим файлам в `lib/`.
+ */
+
 use Bitrix\Main\Loader;
 use Smstraffic\Handlers;
 use Smstraffic\Sender\SmartDelivery;

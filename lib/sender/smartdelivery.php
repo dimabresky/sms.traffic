@@ -13,31 +13,64 @@ use Smstraffic\SmartDelivery\ApiClient;
 Loc::loadMessages(__FILE__);
 
 /**
- * Провайдер SMS для MessageService (SmartDelivery / SMS Traffic BY).
+ * Провайдер отправки SMS для модуля «Служба сообщений» ({@see \Bitrix\MessageService}) через HTTP API
+ * SmartDelivery (SMS Traffic BY).
+ *
+ * Реализует контракт {@see \Bitrix\MessageService\Sender\Base}: идентификатор, отображаемые имена,
+ * проверка готовности к работе, список имён отправителя (originator) и фактическая отправка
+ * {@see sendMessage}. Номера нормализуются до цифр через запятую; тело сообщения дополнительно
+ * обрабатывается методом базового класса {@see \Bitrix\MessageService\Sender\Base::prepareMessageBodyForSend}
+ * (кодировка/ограничения длины по правилам ядра).
+ *
+ * Настройки читаются из модуля `smstraffic` (логин, пароль, originators, `rus`, маршрут, базовые URL API).
  */
 final class SmartDelivery extends Base
 {
+    /**
+     * Уникальный идентификатор провайдера в настройках сайта («Почта и СМС») и в внутренних вызовах MessageService.
+     */
     public const ID = 'smstraffic_smartdelivery';
 
+    /** См. {@see ApiClient}: префикс ключей в таблице опций Битрикс. */
     private const MID = 'smstraffic';
 
+    /**
+     * @return string Всегда {@see self::ID}.
+     */
     public function getId()
     {
         return self::ID;
     }
 
+    /**
+     * Полное имя провайдера в выпадающих списках административной части.
+     *
+     * @return string Локализованная строка (ключ `SMSTRAFFIC_SENDER_NAME`) или запасной текст на английском.
+     */
     public function getName()
     {
         $m = Loc::getMessage('SMSTRAFFIC_SENDER_NAME');
         return $m !== null && $m !== '' ? $m : 'SMS Traffic (SmartDelivery BY)';
     }
 
+    /**
+     * Краткое имя (подпись) провайдера в интерфейсе.
+     *
+     * @return string Локализованная строка (ключ `SMSTRAFFIC_SENDER_SHORT`) или доменное имя по умолчанию.
+     */
     public function getShortName()
     {
         $m = Loc::getMessage('SMSTRAFFIC_SENDER_SHORT');
         return $m !== null && $m !== '' ? $m : 'smstraffic.by';
     }
 
+    /**
+     * Проверяет, можно ли использовать провайдер для отправки.
+     *
+     * Условия: подключён модуль `messageservice`, в настройках `smstraffic` заданы непустые `login` и `password`.
+     *
+     * @return bool `true`, если отправку можно инициировать; иначе провайдер скрыт или неактивен в логике ядра.
+     */
     public function canUse()
     {
         if (!Loader::includeModule('messageservice')) {
@@ -50,6 +83,15 @@ final class SmartDelivery extends Base
         return $login !== '' && $password !== '';
     }
 
+    /**
+     * Возвращает список допустимых имён отправителя (originator) для выбора в SMS-шлюзе.
+     *
+     * Берётся многострочное поле `originators` из настроек (разделители: перевод строки, запятая).
+     * Каждая непустая строка становится парой `id`/`name`. Если список пуст, возвращается один пункт
+     * `id=default` с подписью из языкового файла или строкой `default`.
+     *
+     * @return array<int, array{id: string, name: string}>
+     */
     public function getFromList()
     {
         $parsed = [];
@@ -83,7 +125,16 @@ final class SmartDelivery extends Base
     }
 
     /**
-     * @param array<string, mixed> $messageFields
+     * Отправляет одно SMS (или несколько получателей в одном запросе API, если в `MESSAGE_TO` передан список).
+     *
+     * Ожидаемые ключи `$messageFields` (как передаёт MessageService): `MESSAGE_TO`, `MESSAGE_BODY`, `MESSAGE_FROM`.
+     * При выборе отправителя `default` поле `originator` в API не передаётся. Дополнительно подставляются
+     * `rus`, при заполненности — `route`, `routeGroupId` из настроек модуля. Таймауты HTTP наследуются
+     * от свойств базового класса (`socketTimeout`, `streamTimeout`).
+     *
+     * @param array<string, mixed> $messageFields Поля сообщения от ядра MessageService.
+     *
+     * @return SendMessage Результат с ошибками {@see SendMessage::addError} или {@see SendMessage::setAccepted} при успехе.
      */
     public function sendMessage(array $messageFields)
     {
@@ -157,6 +208,11 @@ final class SmartDelivery extends Base
         return $result;
     }
 
+    /**
+     * Возвращает значение параметра кодировки/транслитерации `rus` для API SmartDelivery.
+     *
+     * Допустимые значения в настройках: `0` (транслит), `1`, `5` (кириллица/Unicode). Любое другое приводится к `5`.
+     */
     private function resolveRusMode(): string
     {
         $v = (string)Option::get(self::MID, 'rus', '5');
@@ -167,6 +223,13 @@ final class SmartDelivery extends Base
         return '5';
     }
 
+    /**
+     * Преобразует получателей из строки Bitrix в формат `phones` API (цифры только, через запятую).
+     *
+     * Поддерживается несколько номеров, разделённых запятой с опциональными пробелами. Нецифровые символы отбрасываются.
+     *
+     * @param string $messageTo Значение `MESSAGE_TO` (один номер или список через запятую).
+     */
     private function normalizePhonesForApi(string $messageTo): string
     {
         $parts = preg_split('/\s*,\s*/', $messageTo, -1, PREG_SPLIT_NO_EMPTY);

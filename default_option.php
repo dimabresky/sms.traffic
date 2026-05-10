@@ -1,6 +1,11 @@
 <?php
 
-/** @var array<string, mixed> */
+/**
+ * Значения опций модуля `smstraffic` по умолчанию (подмешиваются при первом обращении к настройкам).
+ *
+ * Ключи соответствуют полям формы в `options.php` и параметрам, которые читает
+ * {@see \Smstraffic\SmartDelivery\ApiClient} и {@see \Smstraffic\Sender\SmartDelivery}.
+ */
 
 return [
     'login' => '',
