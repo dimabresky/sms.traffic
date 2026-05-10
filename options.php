@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * Административная страница настроек модуля `smstraffic`.
+ *
+ * Сохраняет учётные данные SmartDelivery, список originator, режим `rus`, маршрутизацию и базовые URL API.
+ * Права: чтение от уровня `R`, запись от `W`; POST обрабатывается только с валидной сессией админки.
+ */
+
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Localization\Loc;
 

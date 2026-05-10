@@ -6,16 +6,35 @@ use Bitrix\Main\Config\Option;
 use Bitrix\Main\Web\HttpClient;
 
 /**
- * HTTP(S) отправка через SmartDelivery multi.php + повтор при code 1000 / сетевой ошибке.
+ * Низкоуровневый клиент HTTP POST к SmartDelivery (`multi.php`).
+ *
+ * Обязанности:
+ * - читает учётные данные и базовые URL API из настроек модуля (`login`, `password`,
+ *   `api_base_primary`, `api_base_secondary`);
+ * - объединяет переданные поля с `login`/`password`, отбрасывает не скалярные и `null`;
+ * - сначала вызывает основной endpoint; при отказе с кодом провайдера `1000` или при сетевой
+ *   ошибке HTTP-клиента повторяет запрос на резервный базовый URL;
+ * - разбирает XML-ответ (`result`, `code`, `description`) в унифицированный массив с флагом `success`.
+ *
+ * Таймауты настраиваются через {@see setTimeouts} (по умолчанию 15 с на соединение, 35 с на ответ).
  */
 final class ApiClient
 {
+    /** Идентификатор модуля в `Option::get` / админ-настройках. */
     private const MID = 'smstraffic';
 
+    /** Таймаут установки TCP-соединения (сек.), передаётся в {@see HttpClient}. */
     private int $socketTimeout = 15;
 
+    /** Таймаут чтения ответа (сек.), передаётся в {@see HttpClient}. */
     private int $streamTimeout = 35;
 
+    /**
+     * Задаёт таймауты HTTP-запроса. Нулевые и отрицательные значения заменяются на значения по умолчанию.
+     *
+     * @param int $socketTimeout Секунды до установки соединения (по умолчанию 15).
+     * @param int $streamTimeout Секунды на получение тела ответа (по умолчанию 35).
+     */
     public function setTimeouts(int $socketTimeout, int $streamTimeout): self
     {
         $this->socketTimeout = $socketTimeout > 0 ? $socketTimeout : 15;
@@ -25,7 +44,13 @@ final class ApiClient
     }
 
     /**
-     * @param array<string, scalar|null> $postFields уже готовые пары параметров API (кроме login/password при необходимости — они добавятся здесь).
+     * Выполняет POST на `…/multi.php`: сначала primary URL, при необходимости — secondary.
+     *
+     * К полям запроса автоматически добавляются `login` и `password` из настроек модуля.
+     * Ключи с не-скалярными значениями и `null` удаляются; остальные приводятся к строке.
+     *
+     * @param array<string, scalar|null> $postFields Параметры тела запроса SmartDelivery
+     *        (например `phones`, `message`, `rus`, опционально `originator`, `route`, `routeGroupId`).
      *
      * @return array{
      *     success:bool,
@@ -35,7 +60,8 @@ final class ApiClient
      *     http_status:int,
      *     raw?:string,
      *     error?: string
-     * }
+     * } Результат: при успешном HTTP и корректном XML с `result=OK` и `code=0` (или пустым кодом) —
+     *        `success=true`. Иначе `success=false`; текст ошибки в `description`, `error` или в `raw`.
      */
     public function send(array $postFields): array
     {
@@ -79,9 +105,11 @@ final class ApiClient
     }
 
     /**
-     * @param array<string, string> $fields
+     * Отправляет запрос на основной (primary) базовый URL из настроек.
      *
-     * @return array<string, mixed>
+     * @param array<string, string> $fields Уже нормализованные строковые поля POST.
+     *
+     * @return array<string, mixed> Тот же формат, что у {@see executePost}.
      */
     private function requestPrimary(array $fields, string $primaryBase): array
     {
@@ -89,9 +117,12 @@ final class ApiClient
     }
 
     /**
-     * @param array<string, string> $fields
+     * Выполняет один HTTP POST и разбирает ответ либо фиксирует сбой транспорта.
      *
-     * @return array<string, mixed>
+     * @param array<string, string> $fields Пары ключ-значение для тела POST (все значения — строки).
+     *
+     * @return array<string, mixed> При ошибке HTTP: `success=false`, `http_status`, `raw`, `error`.
+     *         При ответе 2xx: поля от {@see parseReplyXml} плюс `http_status`.
      */
     private function executePost(string $url, array $fields): array
     {
@@ -126,7 +157,13 @@ final class ApiClient
     }
 
     /**
-     * @return array<string, mixed>
+     * Разбирает XML-ответ SmartDelivery в структуру для верхнего уровня {@see send}.
+     *
+     * Ожидаются элементы верхнего уровня: `result` (OK/ERROR), `code` (число; 0 — без ошибки API),
+     * `description`. Пустое тело и невалидный XML трактуются как ошибка.
+     *
+     * @return array<string, mixed> Массив с ключами `success`, при необходимости `code`, `result`,
+     *         `description`, `http_status` (200 для успешного HTTP), опционально `raw`.
      */
     private function parseReplyXml(string $xml): array
     {
@@ -200,7 +237,13 @@ final class ApiClient
     }
 
     /**
-     * @param array<string, mixed> $firstPass
+     * Определяет, нужно ли повторить запрос на резервный (secondary) базовый URL.
+     *
+     * Повтор выполняется, если первый ответ не успешен и выполняется одно из условий:
+     * - в теле ответа указан код API `1000` (типичный сигнал переключения/перегрузки у провайдера);
+     * - или зафиксирована транспортная ошибка (`error` не пустой), например таймаут или обрыв.
+     *
+     * @param array<string, mixed> $firstPass Результат первого вызова {@see executePost}.
      */
     private function shouldRetryOnAlternative(array $firstPass): bool
     {
@@ -220,6 +263,9 @@ final class ApiClient
         return false;
     }
 
+    /**
+     * Обрезает пробелы и завершающий слэш у базового URL, чтобы корректно конкатенировать `/multi.php`.
+     */
     private static function normalizeBaseUrl(string $url): string
     {
         $url = trim($url);

@@ -7,6 +7,13 @@ use Bitrix\Main\ModuleManager;
 
 Loc::loadMessages(__FILE__);
 
+/**
+ * Установочный класс локального модуля `smstraffic`: регистрация в Битрикс и привязка к событию SMS-провайдера.
+ *
+ * При установке модуль регистрируется в реестре, на событие `messageservice` → `onGetSmsSenders` вешается
+ * статический метод {@see \Smstraffic\Handlers::onGetSmsSenders}. При удалении обработчик снимается,
+ * все опции модуля удаляются ({@see \Bitrix\Main\Config\Option::delete}).
+ */
 class smstraffic extends \CModule
 {
     /** @var string */
@@ -22,8 +29,12 @@ class smstraffic extends \CModule
     public $MODULE_NAME;
 
     /** @var string */
+    /** @var string Текст описания в списке модулей; из языкового файла или запасная строка на английском. */
     public $MODULE_DESCRIPTION;
 
+    /**
+     * Подгружает `version.php`, заполняет свойства версии и локализованные имя/описание модуля.
+     */
     public function __construct()
     {
         $arModuleVersion = [];
@@ -42,7 +53,12 @@ class smstraffic extends \CModule
     }
 
     /**
-     * @return bool
+     * Устанавливает модуль: регистрация в `ModuleManager` и события `onGetSmsSenders` для `messageservice`.
+     *
+     * После установки нужно задать логин/пароль в настройках модуля и выбрать провайдер в разделе
+     * «Почта и СМС» главного модуля (идентификатор отправителя — `smstraffic_smartdelivery`).
+     *
+     * @return bool `true` при успешной регистрации (ошибки ядра в типичном сценарии не ожидаются).
      */
     public function DoInstall(): bool
     {
@@ -60,7 +76,9 @@ class smstraffic extends \CModule
     }
 
     /**
-     * @return bool
+     * Удаляет модуль: снимает обработчик события, очищает опции `smstraffic`, снимает регистрацию модуля.
+     *
+     * @return bool `true` после удаления из реестра модулей и опций.
      */
     public function DoUninstall(): bool
     {
