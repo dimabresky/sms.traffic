@@ -1,6 +1,6 @@
 <?php
 
-namespace Smstraffic\SmartDelivery;
+namespace SmsTraffic\SmartDelivery;
 
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Web\HttpClient;
@@ -21,7 +21,7 @@ use Bitrix\Main\Web\HttpClient;
 final class ApiClient
 {
     /** Идентификатор модуля в `Option::get` / админ-настройках. */
-    private const MID = 'smstraffic';
+    private const MID = 'sms.traffic';
 
     /** Таймаут установки TCP-соединения (сек.), передаётся в {@see HttpClient}. */
     private int $socketTimeout = 15;

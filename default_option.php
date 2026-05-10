@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Значения опций модуля `smstraffic` по умолчанию (подмешиваются при первом обращении к настройкам).
+ * Значения опций модуля `sms.traffic` по умолчанию (подмешиваются при первом обращении к настройкам).
  *
  * Ключи соответствуют полям формы в `options.php` и параметрам, которые читает
- * {@see \Smstraffic\SmartDelivery\ApiClient} и {@see \Smstraffic\Sender\SmartDelivery}.
+ * {@see \SmsTraffic\SmartDelivery\ApiClient} и {@see \SmsTraffic\Sender\SmartDelivery}.
  */
 
 return [

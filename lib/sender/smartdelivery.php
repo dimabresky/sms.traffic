@@ -1,6 +1,6 @@
 <?php
 
-namespace Smstraffic\Sender;
+namespace SmsTraffic\Sender;
 
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Error;
@@ -8,7 +8,7 @@ use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\MessageService\Sender\Base;
 use Bitrix\MessageService\Sender\Result\SendMessage;
-use Smstraffic\SmartDelivery\ApiClient;
+use SmsTraffic\SmartDelivery\ApiClient;
 
 Loc::loadMessages(__FILE__);
 
@@ -22,17 +22,17 @@ Loc::loadMessages(__FILE__);
  * обрабатывается методом базового класса {@see \Bitrix\MessageService\Sender\Base::prepareMessageBodyForSend}
  * (кодировка/ограничения длины по правилам ядра).
  *
- * Настройки читаются из модуля `smstraffic` (логин, пароль, originators, `rus`, маршрут, базовые URL API).
+ * Настройки читаются из модуля `sms.traffic` (логин, пароль, originators, `rus`, маршрут, базовые URL API).
  */
 final class SmartDelivery extends Base
 {
     /**
      * Уникальный идентификатор провайдера в настройках сайта («Почта и СМС») и в внутренних вызовах MessageService.
      */
-    public const ID = 'smstraffic_smartdelivery';
+    public const ID = 'sms_traffic_smartdelivery';
 
     /** См. {@see ApiClient}: префикс ключей в таблице опций Битрикс. */
-    private const MID = 'smstraffic';
+    private const MID = 'sms.traffic';
 
     /**
      * @return string Всегда {@see self::ID}.
@@ -45,29 +45,29 @@ final class SmartDelivery extends Base
     /**
      * Полное имя провайдера в выпадающих списках административной части.
      *
-     * @return string Локализованная строка (ключ `SMSTRAFFIC_SENDER_NAME`) или запасной текст на английском.
+     * @return string Локализованная строка (ключ `SMS_TRAFFIC_SENDER_NAME`) или запасной текст на английском.
      */
     public function getName()
     {
-        $m = Loc::getMessage('SMSTRAFFIC_SENDER_NAME');
+        $m = Loc::getMessage('SMS_TRAFFIC_SENDER_NAME');
         return $m !== null && $m !== '' ? $m : 'SMS Traffic (SmartDelivery BY)';
     }
 
     /**
      * Краткое имя (подпись) провайдера в интерфейсе.
      *
-     * @return string Локализованная строка (ключ `SMSTRAFFIC_SENDER_SHORT`) или доменное имя по умолчанию.
+     * @return string Локализованная строка (ключ `SMS_TRAFFIC_SENDER_SHORT`) или доменное имя по умолчанию.
      */
     public function getShortName()
     {
-        $m = Loc::getMessage('SMSTRAFFIC_SENDER_SHORT');
+        $m = Loc::getMessage('SMS_TRAFFIC_SENDER_SHORT');
         return $m !== null && $m !== '' ? $m : 'smstraffic.by';
     }
 
     /**
      * Проверяет, можно ли использовать провайдер для отправки.
      *
-     * Условия: подключён модуль `messageservice`, в настройках `smstraffic` заданы непустые `login` и `password`.
+     * Условия: подключён модуль `messageservice`, в настройках `sms.traffic` заданы непустые `login` и `password`.
      *
      * @return bool `true`, если отправку можно инициировать; иначе провайдер скрыт или неактивен в логике ядра.
      */
@@ -108,7 +108,7 @@ final class SmartDelivery extends Base
         }
 
         if ($parsed === []) {
-            $fallback = Loc::getMessage('SMSTRAFFIC_SENDER_DEFAULT_FROM_LABEL');
+            $fallback = Loc::getMessage('SMS_TRAFFIC_SENDER_DEFAULT_FROM_LABEL');
             if ($fallback === null || $fallback === '') {
                 $fallback = 'default';
             }
@@ -141,7 +141,7 @@ final class SmartDelivery extends Base
         $result = new SendMessage();
 
         if (!$this->canUse()) {
-            $msg = Loc::getMessage('SMSTRAFFIC_ERR_CAN_USE');
+            $msg = Loc::getMessage('SMS_TRAFFIC_ERR_CAN_USE');
             $result->addError(new Error($msg !== null && $msg !== '' ? $msg : 'SMS Traffic: check module settings (login/password).'));
 
             return $result;
@@ -150,7 +150,7 @@ final class SmartDelivery extends Base
         $toRaw = (string)($messageFields['MESSAGE_TO'] ?? '');
         $phones = $this->normalizePhonesForApi($toRaw);
         if ($phones === '') {
-            $msg = Loc::getMessage('SMSTRAFFIC_ERR_PHONE');
+            $msg = Loc::getMessage('SMS_TRAFFIC_ERR_PHONE');
             $result->addError(new Error($msg !== null && $msg !== '' ? $msg : 'Recipient phone is empty or invalid.'));
 
             return $result;
@@ -158,7 +158,7 @@ final class SmartDelivery extends Base
 
         $body = $this->prepareMessageBodyForSend((string)($messageFields['MESSAGE_BODY'] ?? ''));
         if ($body === '') {
-            $msg = Loc::getMessage('SMSTRAFFIC_ERR_BODY');
+            $msg = Loc::getMessage('SMS_TRAFFIC_ERR_BODY');
             $result->addError(new Error($msg !== null && $msg !== '' ? $msg : 'Message body is empty.'));
 
             return $result;

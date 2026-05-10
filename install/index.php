@@ -8,16 +8,18 @@ use Bitrix\Main\ModuleManager;
 Loc::loadMessages(__FILE__);
 
 /**
- * Установочный класс локального модуля `smstraffic`: регистрация в Битрикс и привязка к событию SMS-провайдера.
+ * Установочный класс локального модуля `sms.traffic`: регистрация в Битрикс и привязка к событию SMS-провайдера.
+ *
+ * Имя класса — `sms_traffic`: точки в MODULE_ID заменяются на подчёркивания (требование ядра).
  *
  * При установке модуль регистрируется в реестре, на событие `messageservice` → `onGetSmsSenders` вешается
- * статический метод {@see \Smstraffic\Handlers::onGetSmsSenders}. При удалении обработчик снимается,
+ * статический метод {@see \SmsTraffic\Handlers::onGetSmsSenders}. При удалении обработчик снимается,
  * все опции модуля удаляются ({@see \Bitrix\Main\Config\Option::delete}).
  */
-class smstraffic extends \CModule
+class sms_traffic extends \CModule
 {
     /** @var string */
-    public $MODULE_ID = 'smstraffic';
+    public $MODULE_ID = 'sms.traffic';
 
     /** @var string */
     public $MODULE_VERSION;
@@ -28,7 +30,6 @@ class smstraffic extends \CModule
     /** @var string */
     public $MODULE_NAME;
 
-    /** @var string */
     /** @var string Текст описания в списке модулей; из языкового файла или запасная строка на английском. */
     public $MODULE_DESCRIPTION;
 
@@ -42,8 +43,8 @@ class smstraffic extends \CModule
         $this->MODULE_VERSION = $arModuleVersion['VERSION'];
         $this->MODULE_VERSION_DATE = $arModuleVersion['VERSION_DATE'];
 
-        $this->MODULE_NAME = Loc::getMessage('SMSTRAFFIC_MODULE_NAME');
-        $this->MODULE_DESCRIPTION = Loc::getMessage('SMSTRAFFIC_MODULE_DESC');
+        $this->MODULE_NAME = Loc::getMessage('SMS_TRAFFIC_MODULE_NAME');
+        $this->MODULE_DESCRIPTION = Loc::getMessage('SMS_TRAFFIC_MODULE_DESC');
         if (!$this->MODULE_NAME) {
             $this->MODULE_NAME = 'SMS Traffic SmartDelivery (BY)';
         }
@@ -56,7 +57,7 @@ class smstraffic extends \CModule
      * Устанавливает модуль: регистрация в `ModuleManager` и события `onGetSmsSenders` для `messageservice`.
      *
      * После установки нужно задать логин/пароль в настройках модуля и выбрать провайдер в разделе
-     * «Почта и СМС» главного модуля (идентификатор отправителя — `smstraffic_smartdelivery`).
+     * «Почта и СМС» главного модуля (идентификатор отправителя — `sms_traffic_smartdelivery`).
      *
      * @return bool `true` при успешной регистрации (ошибки ядра в типичном сценарии не ожидаются).
      */
@@ -68,7 +69,7 @@ class smstraffic extends \CModule
             'messageservice',
             'onGetSmsSenders',
             $this->MODULE_ID,
-            '\\Smstraffic\\Handlers',
+            '\\SmsTraffic\\Handlers',
             'onGetSmsSenders'
         );
 
@@ -76,7 +77,7 @@ class smstraffic extends \CModule
     }
 
     /**
-     * Удаляет модуль: снимает обработчик события, очищает опции `smstraffic`, снимает регистрацию модуля.
+     * Удаляет модуль: снимает обработчик события, очищает опции `sms.traffic`, снимает регистрацию модуля.
      *
      * @return bool `true` после удаления из реестра модулей и опций.
      */
@@ -86,7 +87,7 @@ class smstraffic extends \CModule
             'messageservice',
             'onGetSmsSenders',
             $this->MODULE_ID,
-            '\\Smstraffic\\Handlers',
+            '\\SmsTraffic\\Handlers',
             'onGetSmsSenders'
         );
 

@@ -1,8 +1,8 @@
 <?php
 
-namespace Smstraffic;
+namespace SmsTraffic;
 
-use Smstraffic\Sender\SmartDelivery;
+use SmsTraffic\Sender\SmartDelivery;
 
 /**
  * Обработчики событий модуля интеграции с SMS Traffic (SmartDelivery).
@@ -16,7 +16,7 @@ final class Handlers
     /**
      * Возвращает провайдер отправки SMS через HTTP API SmartDelivery (SMS Traffic BY).
      *
-     * Идентификатор отправителя в UI: {@see SmartDelivery::ID} (`smstraffic_smartdelivery`).
+     * Идентификатор отправителя в UI: {@see SmartDelivery::ID} (`sms_traffic_smartdelivery`).
      * Фактическая доступность отправки определяется в {@see SmartDelivery::canUse()}
      * (наличие логина/пароля в настройках модуля и подключённый `messageservice`).
      *

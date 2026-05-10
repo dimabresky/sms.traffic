@@ -1,22 +1,22 @@
 <?php
 
 /**
- * Точка подключения модуля `smstraffic`: регистрация автозагрузки классов в пространстве имён `Smstraffic`.
+ * Точка подключения модуля `sms.traffic`: регистрация автозагрузки классов в пространстве имён `SmsTraffic`.
  *
- * Подключается ядром при `Loader::includeModule('smstraffic')`. Карта соответствует физическим файлам в `lib/`.
+ * Подключается ядром при `Loader::includeModule('sms.traffic')`. Карта соответствует физическим файлам в `lib/`.
  */
 
 use Bitrix\Main\Loader;
-use Smstraffic\Handlers;
-use Smstraffic\Sender\SmartDelivery;
-use Smstraffic\SmartDelivery\ApiClient;
+use SmsTraffic\Handlers;
+use SmsTraffic\Sender\SmartDelivery;
+use SmsTraffic\SmartDelivery\ApiClient;
 
 if (!defined('B_PROLOG_INCLUDED') || B_PROLOG_INCLUDED !== true) {
     die();
 }
 
 Loader::registerAutoLoadClasses(
-    'smstraffic',
+    'sms.traffic',
     [
         Handlers::class => 'lib/handlers.php',
         SmartDelivery::class => 'lib/sender/smartdelivery.php',
