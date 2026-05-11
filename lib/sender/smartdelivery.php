@@ -199,7 +199,7 @@ final class SmartDelivery extends Base
 
         if (($api['success'] ?? false) !== true) {
             $this->logApiError($api, [
-                'to' => $phones,
+                'to' => $this->maskPhones($phones),
                 'from' => $from,
                 'route' => $post['route'] ?? null,
                 'routeGroupId' => $post['routeGroupId'] ?? null,
@@ -252,14 +252,44 @@ final class SmartDelivery extends Base
                 'response' => $api,
             ];
 
+            $logFile = $logDir . '/errors-' . date('Y-m-d') . '.log.php';
+            if (!is_file($logFile)) {
+                file_put_contents($logFile, "<?php http_response_code(404); exit; ?>\n", LOCK_EX);
+            }
+
             file_put_contents(
-                $logDir . '/errors-' . date('Y-m-d') . '.log',
-                json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL,
+                $logFile,
+                json_encode(
+                    $entry,
+                    JSON_UNESCAPED_UNICODE
+                    | JSON_UNESCAPED_SLASHES
+                    | JSON_INVALID_UTF8_SUBSTITUTE
+                    | JSON_THROW_ON_ERROR
+                ) . PHP_EOL,
                 FILE_APPEND | LOCK_EX
             );
         } catch (\Throwable $exception) {
             // Ошибка записи лога не должна мешать штатному возврату ошибки отправки SMS.
         }
+    }
+
+    /**
+     * Маскирует номера перед записью в web-accessible upload-каталог.
+     */
+    private function maskPhones(string $phones): string
+    {
+        $masked = [];
+        foreach (explode(',', $phones) as $phone) {
+            $phone = trim($phone);
+            if ($phone === '') {
+                continue;
+            }
+
+            $visibleTail = substr($phone, -4);
+            $masked[] = str_repeat('*', max(0, strlen($phone) - 4)) . $visibleTail;
+        }
+
+        return implode(',', $masked);
     }
 
     /**
