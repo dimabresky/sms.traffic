@@ -252,22 +252,34 @@ final class SmartDelivery extends Base
                 'response' => $api,
             ];
 
+            $encodedEntry = json_encode(
+                $entry,
+                JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+                | JSON_INVALID_UTF8_SUBSTITUTE
+                | JSON_THROW_ON_ERROR
+            );
+
             $logFile = $logDir . '/errors-' . date('Y-m-d') . '.log.php';
-            if (!is_file($logFile)) {
-                file_put_contents($logFile, "<?php http_response_code(404); exit; ?>\n", LOCK_EX);
+            $handle = fopen($logFile, 'ab');
+            if ($handle === false) {
+                return;
             }
 
-            file_put_contents(
-                $logFile,
-                json_encode(
-                    $entry,
-                    JSON_UNESCAPED_UNICODE
-                    | JSON_UNESCAPED_SLASHES
-                    | JSON_INVALID_UTF8_SUBSTITUTE
-                    | JSON_THROW_ON_ERROR
-                ) . PHP_EOL,
-                FILE_APPEND | LOCK_EX
-            );
+            try {
+                if (flock($handle, LOCK_EX)) {
+                    clearstatcache(true, $logFile);
+                    if ((int)filesize($logFile) === 0) {
+                        fwrite($handle, "<?php http_response_code(404); exit; ?>\n");
+                    }
+
+                    fwrite($handle, $encodedEntry . PHP_EOL);
+                    fflush($handle);
+                    flock($handle, LOCK_UN);
+                }
+            } finally {
+                fclose($handle);
+            }
         } catch (\Throwable $exception) {
             // Ошибка записи лога не должна мешать штатному возврату ошибки отправки SMS.
         }
