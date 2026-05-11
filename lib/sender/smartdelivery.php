@@ -178,6 +178,7 @@ final class SmartDelivery extends Base
             'phones' => $phones,
             'message' => $body,
             'rus' => $this->resolveRusMode(),
+            'want_sms_ids' => '1',
         ];
 
         if ($from !== '') {
