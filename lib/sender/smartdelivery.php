@@ -2,8 +2,10 @@
 
 namespace SmsTraffic\Sender;
 
+use Bitrix\Main\Application;
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Error;
+use Bitrix\Main\IO\Directory;
 use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\MessageService\Sender\Base;
@@ -33,6 +35,9 @@ final class SmartDelivery extends Base
 
     /** См. {@see ApiClient}: префикс ключей в таблице опций Битрикс. */
     private const MID = 'sms.traffic';
+
+    /** Путь относительно корня сайта для журналов ошибок ответов SmartDelivery. */
+    private const LOG_DIR = '/upload/sms.traffic.logs';
 
     /**
      * @return string Всегда {@see self::ID}.
@@ -193,6 +198,13 @@ final class SmartDelivery extends Base
         $api = $client->send($post);
 
         if (($api['success'] ?? false) !== true) {
+            $this->logApiError($api, [
+                'to' => $this->maskPhones($phones),
+                'from' => $from,
+                'route' => $post['route'] ?? null,
+                'routeGroupId' => $post['routeGroupId'] ?? null,
+            ]);
+
             $message = (string)($api['description'] ?? $api['error'] ?? 'SmartDelivery request failed');
             $code = $api['code'] ?? null;
             if ($code !== null && $code !== '') {
@@ -206,6 +218,90 @@ final class SmartDelivery extends Base
         $result->setAccepted();
 
         return $result;
+    }
+
+    /**
+     * Записывает неуспешный ответ API в дневной JSONL-журнал.
+     *
+     * @param array<string, mixed> $api Ответ {@see ApiClient::send()}.
+     * @param array<string, mixed> $context Безопасный контекст отправки без пароля и текста SMS.
+     */
+    private function logApiError(array $api, array $context): void
+    {
+        try {
+            $documentRoot = rtrim(Application::getDocumentRoot(), '/\\');
+            if ($documentRoot === '') {
+                return;
+            }
+
+            $logDir = $documentRoot . self::LOG_DIR;
+            Directory::createDirectory($logDir);
+
+            $accessFile = $logDir . '/.htaccess';
+            if (!is_file($accessFile)) {
+                file_put_contents($accessFile, "Deny from all\n");
+            }
+
+            $entry = [
+                'datetime' => date('c'),
+                'sender' => self::ID,
+                'context' => array_filter(
+                    $context,
+                    static fn($value): bool => $value !== null && $value !== ''
+                ),
+                'response' => $api,
+            ];
+
+            $encodedEntry = json_encode(
+                $entry,
+                JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+                | JSON_INVALID_UTF8_SUBSTITUTE
+                | JSON_THROW_ON_ERROR
+            );
+
+            $logFile = $logDir . '/errors-' . date('Y-m-d') . '.log.php';
+            $handle = fopen($logFile, 'ab');
+            if ($handle === false) {
+                return;
+            }
+
+            try {
+                if (flock($handle, LOCK_EX)) {
+                    clearstatcache(true, $logFile);
+                    if ((int)filesize($logFile) === 0) {
+                        fwrite($handle, "<?php http_response_code(404); exit; ?>\n");
+                    }
+
+                    fwrite($handle, $encodedEntry . PHP_EOL);
+                    fflush($handle);
+                    flock($handle, LOCK_UN);
+                }
+            } finally {
+                fclose($handle);
+            }
+        } catch (\Throwable $exception) {
+            // Ошибка записи лога не должна мешать штатному возврату ошибки отправки SMS.
+        }
+    }
+
+    /**
+     * Маскирует номера перед записью в web-accessible upload-каталог.
+     */
+    private function maskPhones(string $phones): string
+    {
+        $masked = [];
+        foreach (explode(',', $phones) as $phone) {
+            $phone = trim($phone);
+            if ($phone === '') {
+                continue;
+            }
+
+            $visibleTail = substr($phone, -4);
+            $masked[] = str_repeat('*', max(0, strlen($phone) - 4)) . $visibleTail;
+        }
+
+        return implode(',', $masked);
     }
 
     /**
